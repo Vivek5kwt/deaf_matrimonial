@@ -1,8 +1,12 @@
 pluginManagement {
+    def kotlinVersion = providers.gradleProperty("kotlin.version").get()
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+    plugins {
+        id("org.jetbrains.kotlin.android") version kotlinVersion
     }
     includeBuild("../node_modules/react-native-gradle-plugin")
 }
