@@ -1,0 +1,5 @@
+{
+    "education": ["Bachelor's", "Master's", "PhD"],
+    "occupation": ["Engineer", "Doctor", "Teacher"],
+    "annualIncome": ["Below 5 LPA", "5-10 LPA", "Above 10 LPA"]
+}

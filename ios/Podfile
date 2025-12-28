@@ -1,0 +1,51 @@
+require_relative '../node_modules/react-native/scripts/react_native_pods'
+
+platform :ios, '15.1'
+install! 'cocoapods', :deterministic_uuids => false
+
+use_frameworks! :linkage => :static
+
+# Enable New Architecture
+RCT_NEW_ARCH_ENABLED = true
+
+target 'deaf_matrimonial' do
+  config = use_native_modules!
+
+  flags = {
+    :hermes_enabled => true,
+    :fabric_enabled => false,
+    :new_arch_enabled => true
+  }
+  
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    **flags
+  )
+
+  # React Native Firebase pods
+  pod 'RNFBApp', :path => '../node_modules/@react-native-firebase/app'
+  pod 'RNFBAuth', :path => '../node_modules/@react-native-firebase/auth'
+  pod 'RNFBFirestore', :path => '../node_modules/@react-native-firebase/firestore'
+  pod 'RNFBMessaging', :path => '../node_modules/@react-native-firebase/messaging'
+
+  post_install do |installer|
+    react_native_post_install(installer)
+
+    installer.pods_project.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+    end
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+
+        if target.name == 'RCT-Folly'
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        end
+      end
+    end
+  end
+end

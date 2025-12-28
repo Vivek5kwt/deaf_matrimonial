@@ -1,0 +1,5 @@
+[
+    { "religion": "Sikh", "caste": ["Gursikh", "Khatri", "Arora"] },
+    { "religion": "Hindu", "caste": ["Brahmin", "Rajput", "Kshatriya"] },
+    { "religion": "Muslim", "caste": ["Sunni", "Shia"] }
+]

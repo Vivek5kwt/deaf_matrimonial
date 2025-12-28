@@ -1,0 +1,6 @@
+{
+    "maritalStatus": ["Never Married", "Widower", "Divorced", "Awaiting Divorce"],
+    "childrenCount": ["None", "One", "Two", "Three", "Four Plus"],
+    "livingStatus": ["Living with me", "Not living with me"]
+  }
+  

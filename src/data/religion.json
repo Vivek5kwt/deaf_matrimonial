@@ -1,0 +1,33 @@
+{
+    "religions":  [
+        "Hinduism",
+        "Islam",
+        "Christianity",
+        "Sikhism",
+        "Buddhism",
+        "Jainism",
+        "Jain",
+        "Parsi",
+        "Jewish",
+        "Spiritual-not religious",
+        "No Religion",
+        "Other"
+      ],
+      "Other Religion": [
+        "Zoroastrianism",
+        "Judaism",
+        "Bahá'í Faith",
+        "Animism",
+        "Spiritualism",
+        "Tribal Religions",
+        "Lingayatism",
+        "Ayyavazhi",
+        "Sanamahism",
+        "Ravidassia",
+        "Kabir Panth",
+        "Sarnaism",
+        "Nature Worship"
+      ]
+    }
+  
+  
