@@ -1,9 +1,12 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
+
+    // THIS LINE IS CRITICAL
+    includeBuild("../node_modules/react-native-gradle-plugin")
 }
 
 dependencyResolutionManagement {

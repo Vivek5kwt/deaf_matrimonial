@@ -6,13 +6,11 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <!-- For Android 13+ media access -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- (Old storage permissions optional — remove if targetSdk 33+) -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <!-- Optional (only if needed for old devices) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
 
     <application
         android:name=".MainApplication"
@@ -24,7 +22,7 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
-        <!-- 🔔 Your Firebase Messaging Service (ONLY this one should exist) -->
+        <!-- Your FCM service -->
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false">
@@ -33,16 +31,10 @@
             </intent-filter>
         </service>
 
-        <!-- Google Play Services Version -->
-        <meta-data
-            android:name="com.google.android.gms.version"
-            android:value="@integer/google_play_services_version" />
-
         <!-- Default Notification Channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="default"
-            tools:replace="android:value" />
+            android:value="default" />
 
         <!-- Default Notification Icon -->
         <meta-data
@@ -52,8 +44,7 @@
         <!-- Default Notification Color -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
-            android:resource="@color/notification_color"
-            tools:replace="android:resource" />
+            android:resource="@color/notification_color" />
 
         <!-- Main Activity -->
         <activity
