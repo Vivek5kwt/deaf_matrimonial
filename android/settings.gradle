@@ -1,26 +1,19 @@
 pluginManagement {
-    def kotlinVersion = providers.gradleProperty("kotlin.version").get()
     repositories {
+        gradlePluginPortal()
         google()
         mavenCentral()
-        gradlePluginPortal()
     }
-    plugins {
-        id("org.jetbrains.kotlin.android") version kotlinVersion
-    }
-    includeBuild("../node_modules/react-native-gradle-plugin")
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
-        maven { url("$rootDir/../node_modules/react-native/android") }
-        maven { url("$rootDir/../node_modules/jsc-android/dist") }
     }
 }
 
 rootProject.name = "DeafMatrimonial"
-
 include(":app")
+includeBuild("../node_modules/react-native-gradle-plugin")

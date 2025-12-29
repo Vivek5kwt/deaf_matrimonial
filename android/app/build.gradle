@@ -1,7 +1,7 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("com.facebook.react")
+    id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "com.facebook.react"
 }
 
 android {
@@ -33,14 +33,15 @@ android {
 }
 
 dependencies {
-    implementation("com.facebook.react:react-android")
-    if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-android")
+    implementation "com.facebook.react:react-android"
+
+    if (findProperty("hermesEnabled")?.toBoolean() == true) {
+        implementation "com.facebook.react:hermes-android"
     } else {
-        implementation("org.webkit:android-jsc:+")
+        implementation "org.webkit:android-jsc:+"
     }
 
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("com.google.android.gms:play-services-base:18.5.0")
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "com.google.android.material:material:1.11.0"
+    implementation "com.google.android.gms:play-services-base:18.5.0"
 }
