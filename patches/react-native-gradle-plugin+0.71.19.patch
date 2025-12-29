@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-gradle-plugin/build.gradle.kts b/node_modules/react-native-gradle-plugin/build.gradle.kts
+index 4c5f2a4..f69a8f2 100644
+--- a/node_modules/react-native-gradle-plugin/build.gradle.kts
++++ b/node_modules/react-native-gradle-plugin/build.gradle.kts
+@@
+-plugins {
+-  kotlin("jvm") version "1.6.10"
+-  id("java-gradle-plugin")
+-}
++plugins {
++  kotlin("jvm") version "1.9.22"
++  id("java-gradle-plugin")
++}
