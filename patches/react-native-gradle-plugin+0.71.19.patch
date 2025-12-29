@@ -8,6 +8,6 @@ index 4c5f2a4..f69a8f2 100644
 -  id("java-gradle-plugin")
 -}
 +plugins {
-+  kotlin("jvm") version "1.9.22"
++  kotlin("jvm") version "1.9.24"
 +  id("java-gradle-plugin")
 +}
