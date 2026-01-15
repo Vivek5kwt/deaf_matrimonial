@@ -4,16 +4,64 @@ pluginManagement {
         google()
         mavenCentral()
     }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == "org.jetbrains.kotlin.android" || requested.id.id == "org.jetbrains.kotlin.jvm") {
+                useVersion("1.8.20")
+            }
+        }
+    }
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' } // Required for ucrop library used by image-crop-picker
     }
 }
 
 rootProject.name = "DeafMatrimonial"
 include(":app")
 includeBuild("../node_modules/react-native-gradle-plugin")
+
+// Manually include critical packages that aren't being autolinked
+include(":react-native-async-storage_async-storage")
+project(":react-native-async-storage_async-storage").projectDir = new File("../node_modules/@react-native-async-storage/async-storage/android")
+
+include(":react-native-firebase_app")
+project(":react-native-firebase_app").projectDir = new File("../node_modules/@react-native-firebase/app/android")
+
+include(":react-native-firebase_auth")
+project(":react-native-firebase_auth").projectDir = new File("../node_modules/@react-native-firebase/auth/android")
+
+include(":react-native-firebase_firestore")
+project(":react-native-firebase_firestore").projectDir = new File("../node_modules/@react-native-firebase/firestore/android")
+
+include(":react-native-firebase_messaging")
+project(":react-native-firebase_messaging").projectDir = new File("../node_modules/@react-native-firebase/messaging/android")
+
+include(":react-native-snackbar")
+project(":react-native-snackbar").projectDir = new File("../node_modules/react-native-snackbar/android")
+
+include(":react-native-image-crop-picker")
+project(":react-native-image-crop-picker").projectDir = new File("../node_modules/react-native-image-crop-picker/android")
+
+include(":react-native-notifee")
+project(":react-native-notifee").projectDir = new File("../node_modules/@notifee/react-native/android")
+
+include(":react-native-clipboard")
+project(":react-native-clipboard").projectDir = new File("../node_modules/@react-native-clipboard/clipboard/android")
+
+include(":react-native-google-signin")
+project(":react-native-google-signin").projectDir = new File("../node_modules/@react-native-google-signin/google-signin/android")
+
+include(":react-native-gesture-handler")
+project(":react-native-gesture-handler").projectDir = new File("../node_modules/react-native-gesture-handler/android")
+
+include(":react-native-safe-area-context")
+project(":react-native-safe-area-context").projectDir = new File("../node_modules/react-native-safe-area-context/android")
+
+include(":react-native-screens")
+project(":react-native-screens").projectDir = new File("../node_modules/react-native-screens/android")

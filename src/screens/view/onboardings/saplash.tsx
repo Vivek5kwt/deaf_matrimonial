@@ -4,7 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DM, Greentop, IMG_1, OrangeB, oka, patte } from '../../../utils/constants/images/image';
 import styles from '../../../styles/onboadings/styles';
 
-const Screen1 = ({ navigation }) => {
+const Screen1 = ({ navigation, route = { params: {} } }) => {
+    // Ensure route.params exists and is an object
+    const safeRoute = {
+        ...route,
+        params: route?.params && typeof route.params === 'object' ? route.params : {},
+    };
     // Initialize animated values
     const fadeAnim = useRef(new Animated.Value(0)).current; // General fade-in
     const slideAnim = useRef(new Animated.Value(100)).current; // Slide up

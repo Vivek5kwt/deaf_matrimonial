@@ -61,10 +61,17 @@ dependencies {
     // Manually add critical packages that aren't being autolinked
     implementation project(":react-native-async-storage_async-storage")
     implementation project(":react-native-firebase_app")
+    implementation project(":react-native-firebase_auth")
+    implementation project(":react-native-firebase_firestore")
+    implementation project(":react-native-firebase_messaging")
     implementation project(":react-native-snackbar")
     implementation project(":react-native-image-crop-picker")
     implementation project(":react-native-notifee")
     implementation project(":react-native-clipboard")
+    implementation project(":react-native-google-signin")
+    implementation project(":react-native-gesture-handler")
+    implementation project(":react-native-safe-area-context")
+    implementation project(":react-native-screens")
     
     // The React Native Gradle plugin should automatically add other autolinked packages here
     // They are added at build time through the autolinking mechanism

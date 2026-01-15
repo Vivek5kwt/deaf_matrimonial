@@ -3,9 +3,10 @@
  * https://github.com/facebook/react-native
  */
 
-const { getDefaultConfig } = require('metro-config');
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-module.exports = (async () => {
-  const config = await getDefaultConfig();
-  return config;
-})();
+const defaultConfig = getDefaultConfig(__dirname);
+
+const config = {};
+
+module.exports = mergeConfig(defaultConfig, config);

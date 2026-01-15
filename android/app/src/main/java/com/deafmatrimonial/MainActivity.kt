@@ -1,5 +1,4 @@
-
-package com.deaf.matrimonial
+package com.deafmatrimonial
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

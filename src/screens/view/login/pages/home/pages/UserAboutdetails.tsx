@@ -29,7 +29,7 @@ const Screen68 = ({ route, navigation }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(20)).current;
 
-    const { matriId } = route.params;
+    const { matriId } = route.params || {};
     const [userDetails, setUserDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [matchData, setMatchData] = useState(null);

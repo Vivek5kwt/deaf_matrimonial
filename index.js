@@ -2,8 +2,35 @@
  * @format
  */
 
-import { AppRegistry } from 'react-native';
+import { AppRegistry, LogBox } from 'react-native';
 import { name as appName } from './app.json';
+
+// Suppress Firebase deprecation warnings (harmless, will be addressed in future migration)
+// These warnings are from React Native Firebase v23 and don't affect functionality
+LogBox.ignoreLogs([
+  /This method is deprecated/,
+  /React Native Firebase namespaced API/,
+  /migrating-to-v22/,
+  /Please use `getApp\(\)` instead/,
+  /deprecated.*Firebase/,
+]);
+
+// Also suppress console.warn for Firebase deprecation messages
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  const message = args[0]?.toString() || '';
+  // Filter out Firebase deprecation warnings
+  if (
+    message.includes('deprecated') &&
+    (message.includes('React Native Firebase') || 
+     message.includes('namespaced API') ||
+     message.includes('migrating-to-v22') ||
+     message.includes('getApp()'))
+  ) {
+    return; // Suppress this warning
+  }
+  originalWarn.apply(console, args);
+};
 
 // ✅ CRITICAL: Initialize Firebase FIRST, before importing App component
 // This ensures Firebase is ready before any screen components try to use it
