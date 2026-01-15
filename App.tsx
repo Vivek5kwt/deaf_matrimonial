@@ -361,48 +361,11 @@ const AppNavigator = ({ navigationRef }) => {
           headerBackTitleVisible: false,
         }}
       >
-      <Stack.Screen 
-        name="Screen1" 
+      <Stack.Screen
+        name="Screen1"
         component={(() => {
-          // CRITICAL: Runtime check - Screen1 might become undefined
-          console.log('🔍🔍🔍 Screen1 component check at Stack.Screen time:');
-          console.log('   Screen1:', Screen1);
-          console.log('   Screen1 type:', typeof Screen1);
-          console.log('   Screen1 === undefined:', Screen1 === undefined);
-          console.log('   Screen1 === null:', Screen1 === null);
-          
-          if (!Screen1 || Screen1 === undefined || Screen1 === null) {
-            console.error('❌❌❌ CRITICAL: Screen1 is undefined/null at Stack.Screen time!');
-            // Return a guaranteed valid component
-            return function Screen1Fallback(props) {
-              const { View, Text } = require('react-native');
-              return React.createElement(View, {
-                style: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }
-              },
-                React.createElement(Text, { style: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 } }, 'Screen Error'),
-                React.createElement(Text, { style: { fontSize: 14, color: '#666' } }, 'Screen1 is undefined')
-              );
-            };
-          }
-          
-          // Wrap Screen1 to ensure it's always valid
-          return function Screen1SafeWrapper(props) {
-            try {
-              if (!Screen1 || Screen1 === undefined || Screen1 === null) {
-                throw new Error('Screen1 became undefined during render');
-              }
-              return React.createElement(Screen1, props);
-            } catch (error) {
-              console.error('❌❌❌ Error rendering Screen1:', error);
-              const { View, Text } = require('react-native');
-              return React.createElement(View, {
-                style: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }
-              },
-                React.createElement(Text, { style: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 } }, 'Screen Error'),
-                React.createElement(Text, { style: { fontSize: 14, color: '#666' } }, error.message)
-              );
-            }
-          };
+          const comp = ensureValidComponent(validatedScreens.Screen1, 'Screen1');
+          return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen1" /> : comp;
         })()}
         options={{ headerShown: false }}
         initialParams={{}}
