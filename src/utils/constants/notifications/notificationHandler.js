@@ -10,14 +10,29 @@ import {
   requestPermission,
   AuthorizationStatus
 } from '@react-native-firebase/messaging';
+import { getApps } from '@react-native-firebase/app';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { Platform, PermissionsAndroid } from 'react-native';
+import { initFirebase } from '../../../config/firebaseConfig';
 
 let fcmToken = null;
 let navigationRef = null;
 let notificationListenersActive = false;
+let messagingInstance = null;
 
-const messagingInstance = getMessaging();
+
+// Get messaging instance - will be initialized after Firebase is ready
+function getMessagingInstance() {
+  if (!messagingInstance) {
+    // Ensure Firebase is initialized first
+    if (getApps().length === 0) {
+      console.warn('⚠️ Firebase not initialized! Call initFirebase() first.');
+      throw new Error('Firebase not initialized. Call initFirebase() before using messaging.');
+    }
+    messagingInstance = getMessaging();
+  }
+  return messagingInstance;
+}
 
 // ================== 0️⃣ Set Navigation Ref ==================
 export function setNavigationReference(ref) {
@@ -39,7 +54,8 @@ export async function requestNotificationPermissions() {
     }
 
     if (Platform.OS === 'ios') {
-      const authStatus = await requestPermission(messagingInstance);
+      const messaging = getMessagingInstance();
+      const authStatus = await requestPermission(messaging);
       const enabled =
         authStatus === AuthorizationStatus.AUTHORIZED ||
         authStatus === AuthorizationStatus.PROVISIONAL;
@@ -74,10 +90,21 @@ export async function setupNotificationChannels() {
 // ================== 3️⃣ FCM Token Management ==================
 export async function getFcmToken() {
   try {
-    await messagingInstance.registerDeviceForRemoteMessages();
+    const messagingInstance = getMessagingInstance();
+    // For iOS, register device for remote messages (only on iOS)
+    // Note: This method is deprecated but still works. The warning can be ignored for now.
     if (Platform.OS === 'ios') {
-      const apnsToken = await messagingInstance.getAPNSToken();
-      console.log('📲 APNS Token:', apnsToken);
+      try {
+        // Call as method on messaging instance (works in v23)
+        await messagingInstance.registerDeviceForRemoteMessages();
+        const apnsToken = await messagingInstance.getAPNSToken();
+        console.log('📲 APNS Token:', apnsToken);
+      } catch (error) {
+        // Ignore if already registered or other non-critical errors
+        if (!error.message.includes('already registered')) {
+          console.warn('⚠️ iOS device registration warning:', error.message);
+        }
+      }
     }
     fcmToken = await getToken(messagingInstance);
     console.log('🔑 FCM Token:', fcmToken);
@@ -94,7 +121,8 @@ export function getCurrentToken() {
 
 export async function deleteFcmToken() {
   try {
-    await deleteToken(messagingInstance);
+    const messaging = getMessagingInstance();
+    await deleteToken(messaging);
     fcmToken = null;
     console.log('🗑️ FCM token deleted');
   } catch (error) {
@@ -125,26 +153,27 @@ export function setupNotificationHandlers(onNotificationTap) {
   if (notificationListenersActive) return () => {};
 
   // Foreground
-  const unsubscribeForeground = onMessage(messagingInstance, async (remoteMessage) => {
+  const messaging = getMessagingInstance();
+  const unsubscribeForeground = onMessage(messaging, async (remoteMessage) => {
     console.log('🌐 Foreground notification:', remoteMessage);
     await displayNotification(remoteMessage);
   });
 
   // Background
-  setBackgroundMessageHandler(messagingInstance, async (remoteMessage) => {
+  setBackgroundMessageHandler(messaging, async (remoteMessage) => {
     console.log('🌐 Background notification:', remoteMessage);
     await displayNotification(remoteMessage);
   });
 
   // Opened from background
-  const unsubscribeOpenedApp = onNotificationOpenedApp(messagingInstance, (remoteMessage) => {
+  const unsubscribeOpenedApp = onNotificationOpenedApp(messaging, (remoteMessage) => {
     console.log('🚀 Opened from background:', remoteMessage);
     if (remoteMessage.data) handleNotificationNavigation(remoteMessage.data);
     if (onNotificationTap && remoteMessage.data) onNotificationTap(remoteMessage.data);
   });
 
   // Quit state
-  getInitialNotification(messagingInstance).then((remoteMessage) => {
+  getInitialNotification(messaging).then((remoteMessage) => {
     if (remoteMessage?.data) {
       console.log('🚀 Opened from quit state:', remoteMessage);
       handleNotificationNavigation(remoteMessage.data);
@@ -167,7 +196,8 @@ export function setupNotificationHandlers(onNotificationTap) {
     unsubscribeForeground();
     unsubscribeOpenedApp();
     unsubscribeNotifee();
-    setBackgroundMessageHandler(messagingInstance, null);
+    const messaging = getMessagingInstance();
+    setBackgroundMessageHandler(messaging, null);
     notificationListenersActive = false;
   };
 }
@@ -195,6 +225,11 @@ function handleNotificationNavigation(data) {
 export async function initializeFCM(onNotificationTap) {
   try {
     console.log('🚀 Initializing FCM...');
+    
+    // Initialize Firebase first
+    await initFirebase();
+    console.log('✅ Firebase initialized');
+    
     const permissionGranted = await requestNotificationPermissions();
     if (!permissionGranted) return false;
 

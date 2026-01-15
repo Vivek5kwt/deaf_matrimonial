@@ -13,10 +13,21 @@ const firebaseConfig = {
   
 };
 
+let firebaseInitialized = false;
+
 export const initFirebase = async () => {
+  if (firebaseInitialized) {
+    return auth();
+  }
+  
+  // Firebase should already be initialized in index.js, but check anyway
   if (getApps().length === 0) {
     await initializeApp(firebaseConfig);
-    console.log("Firebase initialized");
+    console.log("Firebase initialized in initFirebase");
+    firebaseInitialized = true;
+  } else {
+    console.log("Firebase already initialized (from index.js)");
+    firebaseInitialized = true;
   }
 
   GoogleSignin.configure({

@@ -5,6 +5,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActiveIconProvider } from './src/redux/ActiveIconContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { LogBox } from 'react-native';
+
+// Suppress Firebase deprecation warnings in App component as well
+LogBox.ignoreLogs([
+  'This method is deprecated',
+  'React Native Firebase namespaced API',
+  'migrating-to-v22',
+]);
 import {
   initializeFCM,
   getCurrentToken,
@@ -69,8 +77,8 @@ import Screen66 from "./src/screens/view/Pay/Pay.tsx";
 import Screen67 from "./src/screens/view/profileEdit/EditProfile.tsx";
 import Screen68 from "./src/screens/view/login/pages/home/pages/UserAboutdetails.tsx";
 import SearchResultsScreen from "./src/screens/view/login/pages/home/pages/SearchResults.tsx";
-import AddSuccessStoryScreen from "./src/screens/view/  SuccessStoriesScreen/  AddSuccessStoryScreen.tsx";
-import SuccessStoriesScreen from "./src/screens/view/  SuccessStoriesScreen/  SuccessStoriesScreen.tsx";
+import AddSuccessStoryScreen from "./src/screens/view/SuccessStoriesScreen/AddSuccessStoryScreen.tsx";
+import SuccessStoriesScreen from "./src/screens/view/SuccessStoriesScreen/SuccessStoriesScreen.tsx";
 import NotificationBell from "./src/screens/view/login/pages/notification/Notifications.js";
 import Screen48 from "./src/screens/view/login/forgetPassword/otp_verify.tsx";
 import Screen69 from "./src/screens/view/login/forgetPassword/set_password.tsx";
@@ -82,6 +90,23 @@ import PaymentErrorScreen from "./src/components/PremiumCard/PaymentErrorScreen.
 const queryClient = new QueryClient();
 
 const Stack = createNativeStackNavigator();
+
+// Wrapper component to ensure route.params is always an object
+const withSafeRouteParams = (Component) => {
+  return (props) => {
+    // Ensure route.params is always an object
+    const safeProps = {
+      ...props,
+      route: {
+        ...props.route,
+        params: props.route?.params && typeof props.route.params === 'object' 
+          ? props.route.params 
+          : {},
+      },
+    };
+    return <Component {...safeProps} />;
+  };
+};
 
 const AppNavigator = ({ navigationRef }) => (
   <NavigationContainer
@@ -97,11 +122,17 @@ const AppNavigator = ({ navigationRef }) => (
   >
 
     <Stack.Navigator
+      initialRouteName="Screen1"
       screenOptions={{
         headerBackTitleVisible: false,
       }}
     >
-      <Stack.Screen name="Screen1" component={Screen1} options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="Screen1" 
+        component={withSafeRouteParams(Screen1)} 
+        options={{ headerShown: false }}
+        initialParams={{}}
+      />
       <Stack.Screen name="Screen2" component={Screen2} options={{ headerShown: false }} />
       <Stack.Screen name="Screen3" component={Screen3} options={{ headerShown: false }} />
       <Stack.Screen name="Screen4" component={Screen4} options={{ headerShown: false }} />
@@ -172,7 +203,6 @@ const AppNavigator = ({ navigationRef }) => (
 
     </Stack.Navigator>
   </NavigationContainer>
-
 );
 
 const App = (props) => {
@@ -190,13 +220,29 @@ const App = (props) => {
   }, []);
 
   useEffect(() => {
-    const initApp = async () => {
-      const initialized = await initializeFCM(handleNotificationTap);
-      const token = getCurrentToken();
-      console.log('🔑 Current FCM Token:', token);
+    // Set a timeout to ensure app loads even if Firebase takes too long
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Firebase initialization timeout - loading app anyway');
       setFirebaseInitialized(true);
+    }, 3000); // 3 second timeout
+
+    const initApp = async () => {
+      try {
+        const initialized = await initializeFCM(handleNotificationTap);
+        const token = getCurrentToken();
+        console.log('🔑 Current FCM Token:', token);
+        clearTimeout(timeout);
+        setFirebaseInitialized(true);
+      } catch (error) {
+        console.error('❌ Firebase initialization error:', error);
+        clearTimeout(timeout);
+        // Still set to true to allow app to load even if Firebase fails
+        setFirebaseInitialized(true);
+      }
     };
     initApp();
+
+    return () => clearTimeout(timeout);
   }, [handleNotificationTap]);
 
 
@@ -210,7 +256,13 @@ const App = (props) => {
 
 
   if (!firebaseInitialized) {
-    return null;
+    return (
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+          {/* Loading screen - Firebase initializing */}
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    );
   }
 
   return (

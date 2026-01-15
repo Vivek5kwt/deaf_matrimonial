@@ -1,8 +1,39 @@
 plugins {
     id "com.android.application" version "8.2.2" apply false
     id "com.android.library" version "8.2.2" apply false
-    id "org.jetbrains.kotlin.android" version "1.9.24" apply false
-    id "com.facebook.react" version "0.76.1" apply false
+    id "org.jetbrains.kotlin.android" version "1.8.20" apply false
+    id "com.facebook.react" version "0.71.19" apply false
+}
+
+// Set ext properties for Google Sign-In and other packages
+ext {
+    compileSdkVersion = 34
+    minSdkVersion = 24
+    targetSdkVersion = 34
+    kotlinVersion = "1.8.20"
+
+
+configurations.all {
+    resolutionStrategy {
+        force "org.jetbrains.kotlin:kotlin-stdlib:1.8.20"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.20"
+        force "org.jetbrains.kotlin:kotlin-reflect:1.8.20"
+        // Force compatible versions of androidx libraries to avoid AGP 8.6.0 requirement
+        force "androidx.core:core:1.12.0"
+        force "androidx.core:core-ktx:1.12.0"
+        force "androidx.activity:activity:1.8.2"
+        // Workaround for bcprov-jdk18on Java 21 bytecode issue - use older version
+        // bcprov-jdk18on-1.79 contains Java 21 bytecode which Gradle 8.2 ASM can't process
+        // Force version 1.78 which uses Java 17 bytecode
+        eachDependency { details ->
+            if (details.requested.group == 'org.bouncycastle' && details.requested.name.startsWith('bcprov')) {
+                if (details.requested.version == '1.79' || details.requested.version.startsWith('1.79')) {
+                    details.useVersion '1.78'
+                }
+            }
+        }
+    }
 }
 
 task clean(type: Delete) {

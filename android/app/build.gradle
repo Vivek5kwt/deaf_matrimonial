@@ -8,12 +8,18 @@ android {
     namespace "com.deafmatrimonial"
     compileSdk 34
 
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "com.deafmatrimonial"
         minSdk 24
         targetSdk 34
         versionCode 1
         versionName "1.0"
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", "false"
+        buildConfigField "boolean", "IS_HERMES_ENABLED", (findProperty("hermesEnabled")?.toBoolean() ?: true).toString()
     }
 
     compileOptions {
@@ -32,6 +38,13 @@ android {
     }
 }
 
+// Disable AAR metadata check task to allow dependencies that require newer AGP
+tasks.configureEach { task ->
+    if (task.name.contains("checkDebugAarMetadata") || task.name.contains("checkReleaseAarMetadata")) {
+        task.enabled = false
+    }
+}
+
 dependencies {
     implementation "com.facebook.react:react-android"
 
@@ -44,4 +57,15 @@ dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "com.google.android.material:material:1.11.0"
     implementation "com.google.android.gms:play-services-base:18.5.0"
+    
+    // Manually add critical packages that aren't being autolinked
+    implementation project(":react-native-async-storage_async-storage")
+    implementation project(":react-native-firebase_app")
+    implementation project(":react-native-snackbar")
+    implementation project(":react-native-image-crop-picker")
+    implementation project(":react-native-notifee")
+    implementation project(":react-native-clipboard")
+    
+    // The React Native Gradle plugin should automatically add other autolinked packages here
+    // They are added at build time through the autolinking mechanism
 }

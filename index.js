@@ -1,27 +1,77 @@
+/**
+ * @format
+ */
+
 import { AppRegistry } from 'react-native';
 import { name as appName } from './app.json';
-import App from './App';
-import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
-import notifee, { EventType } from '@notifee/react-native';
 
-// Get messaging instance
-const messaging = getMessaging();
-
-// ✅ Handle FCM background messages
-setBackgroundMessageHandler(messaging, async remoteMessage => {
-  console.log('[Background] FCM message received:', JSON.stringify(remoteMessage));
-  // Show a notification if you want
-});
-
-// ✅ Notifee background handler
-notifee.onBackgroundEvent(async ({ type, detail }) => {
-  console.log('[Notifee Background Event]', type, detail);
-
-  if (type === EventType.PRESS && detail.notification?.data) {
-    console.log('🔔 Notification tapped while app was killed/backgrounded');
-    // Do not navigate here — wait for app mount
+// ✅ CRITICAL: Initialize Firebase FIRST, before importing App component
+// This ensures Firebase is ready before any screen components try to use it
+console.log('Initializing Firebase before loading App...');
+try {
+  const { initializeApp, getApps } = require('@react-native-firebase/app');
+  const firebaseConfig = {
+    apiKey: "AIzaSyDzI3S7RcGRaFBBzAd70ZnTKKcJvKf-rsM",
+    authDomain: "deaf-matrimonial-bed02.firebaseapp.com",
+    databaseURL: "https://deaf-matrimonial-bed02-default-rtdb.firebaseio.com/",
+    projectId: "deaf-matrimonial-bed02",
+    storageBucket: "deafmatrimonial-d8ffd.firebasestorage.ap",
+    messagingSenderId: "744077823025",
+    appId: "1:744077823025:android:80069e3216e3e5a80c1910",
+  };
+  
+  // Initialize Firebase synchronously if not already initialized
+  // Note: initializeApp is synchronous in React Native Firebase
+  if (getApps().length === 0) {
+    initializeApp(firebaseConfig);
+    console.log('✅ Firebase initialized synchronously in index.js');
+  } else {
+    console.log('✅ Firebase already initialized');
   }
-});
+} catch (error) {
+  console.warn('⚠️ Firebase initialization in index.js failed:', error.message);
+  // Continue anyway - Firebase will be initialized in App.tsx
+}
 
-// ✅ Register App
+// ✅ CRITICAL: Register the app component AFTER Firebase initialization
+// The app registration must happen synchronously and immediately
+console.log('Registering app with name:', appName);
+
+// Import App - if it fails, we'll catch it and show an error screen
+let App;
+let appLoadError = null;
+try {
+  App = require('./App').default;
+} catch (error) {
+  appLoadError = error;
+  console.error('❌ Failed to load App component:', error.message);
+  // Create a minimal fallback app that shows the error
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  App = () => {
+    const errorMessage = appLoadError ? appLoadError.message : 'Unknown error';
+    return React.createElement(View, { 
+      style: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        padding: 20, 
+        backgroundColor: '#fff' 
+      } 
+    },
+      React.createElement(Text, { 
+        style: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, color: '#000' } 
+      }, 'App Loading Error'),
+      React.createElement(Text, { 
+        style: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 10 } 
+      }, errorMessage),
+      React.createElement(Text, { 
+        style: { fontSize: 12, color: '#999', textAlign: 'center' } 
+      }, 'Check Metro bundler and device logs for details.')
+    );
+  };
+}
+
+// Register immediately - this must happen no matter what
 AppRegistry.registerComponent(appName, () => App);
+console.log('✅ App registered successfully with name:', appName);
