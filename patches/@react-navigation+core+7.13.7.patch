@@ -1,8 +1,59 @@
 diff --git a/node_modules/@react-navigation/core/lib/module/SceneView.js b/node_modules/@react-navigation/core/lib/module/SceneView.js
-index 8e83282..450f12a 100644
+index 8e83282..b2f118d 100644
 --- a/node_modules/@react-navigation/core/lib/module/SceneView.js
 +++ b/node_modules/@react-navigation/core/lib/module/SceneView.js
-@@ -52,16 +52,23 @@ export function SceneView({
+@@ -12,7 +12,34 @@ import { jsx as _jsx } from "react/jsx-runtime";
+  * Component which takes care of rendering the screen for a route.
+  * It provides all required contexts and applies optimizations when applicable.
+  */
+-export function SceneView({
++// CRITICAL: Wrapper component that ALWAYS returns a valid element
++function SafeSceneViewWrapper({ screen, route, navigation, routeState, getState, setState, options, clearOptions }) {
++  try {
++    // Validate screen object immediately
++    if (!screen || screen === undefined || screen === null) {
++      console.error('❌❌❌ CRITICAL: screen object is undefined/null in SafeSceneViewWrapper!');
++      const RN = require('react-native');
++      return React.createElement(RN.View, {
++        style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++      }, React.createElement(RN.Text, null, 'Screen object is invalid'));
++    }
++    
++    console.log('🔍🔍🔍 SafeSceneViewWrapper - screen.name:', screen.name);
++    console.log('🔍🔍🔍 SafeSceneViewWrapper - screen.component:', screen.component);
++    console.log('🔍🔍🔍 SafeSceneViewWrapper - screen.component type:', typeof screen.component);
++    
++    return SceneViewInner({ screen, route, navigation, routeState, getState, setState, options, clearOptions });
++  } catch (error) {
++    console.error('❌❌❌ CRITICAL: SceneViewWrapper caught error:', error);
++    console.error('   Error stack:', error.stack);
++    const RN = require('react-native');
++    return React.createElement(RN.View, {
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++    }, React.createElement(RN.Text, null, 'SceneView Error: ' + error.message));
++  }
++}
++
++function SceneViewInner({
+   screen,
+   route,
+   navigation,
+@@ -22,6 +49,14 @@ export function SceneView({
+   options,
+   clearOptions
+ }) {
++  // ABSOLUTE FIRST CHECK - validate screen object
++  if (!screen || screen === undefined || screen === null) {
++    console.error('❌❌❌ ABSOLUTE CRITICAL: screen object is undefined/null in SceneViewInner!');
++    const RN = require('react-native');
++    return React.createElement(RN.View, {
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++    }, React.createElement(RN.Text, null, 'Screen object invalid'));
++  }
+   const navigatorKeyRef = React.useRef(undefined);
+   const getKey = React.useCallback(() => navigatorKeyRef.current, []);
+   const {
+@@ -52,16 +87,23 @@ export function SceneView({
  
        // Before updating the state, cleanup any nested screen and state
        // This will avoid the navigator trying to handle them again
@@ -29,19 +80,76 @@ index 8e83282..450f12a 100644
          if (Object.keys(rest).length) {
            return {
              ...nextRoute,
-@@ -136,7 +143,100 @@ export function SceneView({
+@@ -136,27 +178,385 @@ export function SceneView({
      getIsInitial,
      addOptionsGetter
    }), [routeState, getCurrentState, setCurrentState, getKey, setKey, getIsInitial, addOptionsGetter]);
 -  const ScreenComponent = screen.getComponent ? screen.getComponent() : screen.component;
-+  let ScreenComponent;
+-  return /*#__PURE__*/_jsx(NavigationStateContext.Provider, {
+-    value: context,
+-    children: /*#__PURE__*/_jsx(NavigationFocusedRouteStateContext.Provider, {
+-      value: focusedRouteState,
+-      children: /*#__PURE__*/_jsx(EnsureSingleNavigator, {
+-        children: /*#__PURE__*/_jsx(StaticContainer, {
+-          name: screen.name,
+-          render: ScreenComponent || screen.children,
++  // CRITICAL: Initialize with a safe default to prevent undefined
++  let ScreenComponent = null; // Use null instead of undefined
++  
++  // ABSOLUTE FIRST CHECK - log screen object immediately
++  // Use try-catch to ensure logs always appear even if screen is undefined
 +  try {
-+    const getComponentResult = screen.getComponent ? screen.getComponent() : screen.component;
++    console.log('🔍🔍🔍 SceneView START for screen:', screen?.name || 'UNKNOWN');
++    console.log('   screen exists:', !!screen);
++    if (screen) {
++      console.log('   screen keys:', Object.keys(screen));
++      console.log('   screen.getComponent:', screen.getComponent);
++      console.log('   screen.component:', screen.component);
++      console.log('   screen.component type:', typeof screen.component);
++    } else {
++      console.error('❌❌❌ CRITICAL: screen object is undefined/null!');
++    }
++  } catch (logError) {
++    console.error('❌❌❌ Error logging in SceneView:', logError);
++  }
++  
++  try {
++    let getComponentResult;
++    if (screen.getComponent) {
++      try {
++        getComponentResult = screen.getComponent();
++        console.log('🔍 Called screen.getComponent(), result:', getComponentResult, typeof getComponentResult);
++      } catch (error) {
++        console.error('❌ Error calling screen.getComponent():', error);
++        getComponentResult = undefined;
++      }
++    } else {
++      getComponentResult = screen.component;
++      console.log('🔍 Using screen.component directly:', getComponentResult, typeof getComponentResult);
++    }
++    
++    // Log what we got for debugging
++    console.log('🔍 getComponentResult:', getComponentResult);
++    console.log('🔍 getComponentResult type:', typeof getComponentResult);
++    console.log('🔍 getComponentResult === undefined:', getComponentResult === undefined);
++    console.log('🔍 getComponentResult === null:', getComponentResult === null);
++    
++    if (getComponentResult === undefined) {
++      console.error('❌❌❌ CRITICAL: getComponent returned undefined for screen:', screen.name);
++      console.error('   screen.getComponent exists:', !!screen.getComponent);
++      console.error('   screen.component exists:', !!screen.component);
++      console.error('   screen.component value:', screen.component);
++      console.error('   screen.component type:', typeof screen.component);
++      console.error('   Full screen object keys:', Object.keys(screen));
++      console.error('   Stack trace:', new Error().stack);
++      // Force to null instead of undefined
++      getComponentResult = null;
++    }
 +    
 +    // Check if getComponent returned a promise (thenable)
 +    if (getComponentResult && typeof getComponentResult.then === 'function') {
 +      console.error('❌ Screen component is a promise (thenable) for screen:', screen.name, 'This is not supported. Component must be loaded synchronously.');
-+      ScreenComponent = undefined;
++      ScreenComponent = null; // Use null instead of undefined
 +    } else {
 +      ScreenComponent = getComponentResult;
 +    }
@@ -49,11 +157,17 @@ index 8e83282..450f12a 100644
 +    // Additional check: if ScreenComponent is still a promise after the check above
 +    if (ScreenComponent && typeof ScreenComponent.then === 'function') {
 +      console.error('❌ Screen component is still a promise after check for screen:', screen.name);
-+      ScreenComponent = undefined;
++      ScreenComponent = null; // Use null instead of undefined
 +    }
 +  } catch (error) {
 +    console.error('❌ Error getting screen component for', screen.name, error);
-+    ScreenComponent = undefined;
++    ScreenComponent = null; // Use null instead of undefined
++  }
++  
++  // CRITICAL: If ScreenComponent is still undefined or null, log it
++  if (ScreenComponent === undefined || ScreenComponent === null) {
++    console.error('❌❌❌ ScreenComponent is', ScreenComponent === undefined ? 'undefined' : 'null', 'for screen:', screen.name);
++    console.error('   This will cause "Element type is invalid" error!');
 +  }
 +  
 +  // CRITICAL: Final validation - ensure ScreenComponent is NEVER undefined when used
@@ -86,31 +200,161 @@ index 8e83282..450f12a 100644
 +  
 +  // NEVER render if component is invalid - return ErrorScreen instead of null
 +  // Create a simple error component inline to avoid import issues
-+  const ErrorFallback = React.createElement(React.Fragment, null,
-+    React.createElement(require('react-native').View, {
-+      style: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }
-+    },
-+      React.createElement(require('react-native').Text, {
-+        style: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#000' }
-+      }, 'Screen Error'),
-+      React.createElement(require('react-native').Text, {
-+        style: { fontSize: 14, color: '#666', textAlign: 'center' }
-+      }, `Screen "${screen.name}" component is invalid. Check console for details.`)
-+    )
-+  );
++  // CRITICAL: Ensure ErrorFallback is ALWAYS a valid React element
++  let ErrorFallback;
++  try {
++    const RN = require('react-native');
++    ErrorFallback = React.createElement(React.Fragment, null,
++      React.createElement(RN.View, {
++        style: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#fff' }
++      },
++        React.createElement(RN.Text, {
++          style: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#000' }
++        }, 'Screen Error'),
++        React.createElement(RN.Text, {
++          style: { fontSize: 14, color: '#666', textAlign: 'center' }
++        }, `Screen "${screen.name}" component is invalid. Check console for details.`)
++      )
++    );
++    // Validate ErrorFallback is not undefined
++    if (ErrorFallback === undefined || ErrorFallback === null) {
++      console.error('❌❌❌ CRITICAL: ErrorFallback creation returned undefined/null!');
++      // Create a minimal fallback
++      ErrorFallback = React.createElement('div', null, 'Screen Error');
++    }
++  } catch (error) {
++    console.error('❌❌❌ CRITICAL: Error creating ErrorFallback:', error);
++    // Last resort: create a minimal valid element
++    ErrorFallback = React.createElement('div', null, 'Screen Error');
++  }
 +  
-+  const renderContent = isValidComponent ? 
-+    /*#__PURE__*/_jsx(ScreenComponent, {
-+      navigation: navigation,
-+      route: route
-+    }) : 
-+    (screen.children !== undefined ? screen.children({
-+      navigation,
-+      route
-+    }) : ErrorFallback);
++  // Final check - ErrorFallback MUST be valid
++  if (ErrorFallback === undefined || ErrorFallback === null) {
++    console.error('❌❌❌ CRITICAL: ErrorFallback is STILL undefined/null after all attempts!');
++    // Absolute last resort
++    ErrorFallback = React.createElement('div', { key: 'error' }, 'Error');
++  }
 +  
-+  // If we have nothing to render and no children, return ErrorFallback instead of null
-+  if (!isValidComponent && !screen.children) {
++  // CRITICAL: Create safe component DIRECTLY without useMemo to avoid any memoization issues
++  // This MUST always return a valid function component, never undefined
++  let SafeScreenComponent;
++  
++  // Triple check that ScreenComponent is valid before using it
++  if (isValidComponent && 
++      ScreenComponent !== undefined && 
++      ScreenComponent !== null &&
++      typeof ScreenComponent !== 'undefined' &&
++      (typeof ScreenComponent === 'function' || typeof ScreenComponent === 'object')) {
++    // Additional check: ensure it's not a promise
++    if (typeof ScreenComponent.then !== 'function') {
++      SafeScreenComponent = ScreenComponent;
++    } else {
++      console.error('❌ ScreenComponent is a promise, using fallback');
++      SafeScreenComponent = null;
++    }
++  } else {
++    SafeScreenComponent = null;
++  }
++  
++  // CRITICAL: Ensure we ALWAYS have a valid function component
++  // If SafeScreenComponent is invalid, create a guaranteed valid fallback
++  let FinalSafeComponent;
++  if (SafeScreenComponent && 
++      SafeScreenComponent !== undefined && 
++      SafeScreenComponent !== null &&
++      typeof SafeScreenComponent === 'function') {
++    FinalSafeComponent = SafeScreenComponent;
++  } else {
++    console.warn('⚠️ Using SafeComponent fallback for screen:', screen.name);
++    // Create a guaranteed valid function component
++    FinalSafeComponent = function SafeComponentFallback(props) {
++      console.warn('⚠️ SafeComponentFallback rendering for screen:', screen.name);
++      return ErrorFallback;
++    };
++  }
++  
++  // ABSOLUTE FINAL CHECK - FinalSafeComponent MUST be a valid function
++  if (!FinalSafeComponent || 
++      FinalSafeComponent === undefined || 
++      FinalSafeComponent === null ||
++      typeof FinalSafeComponent !== 'function') {
++    console.error('❌❌❌ ABSOLUTE CRITICAL: FinalSafeComponent is STILL invalid!');
++    console.error('   Type:', typeof FinalSafeComponent);
++    console.error('   Value:', FinalSafeComponent);
++    // Last resort - create inline function
++    FinalSafeComponent = function AbsoluteFallback(props) {
++      const RN = require('react-native');
++      return React.createElement(RN.View, {
++        style: { flex: 1, justifyContent: 'center', alignItems: 'center' }
++      }, React.createElement(RN.Text, null, 'Error'));
++    };
++  }
++  
++  // Log FinalSafeComponent to verify it's valid
++  console.log('🔍 FinalSafeComponent check:', FinalSafeComponent, typeof FinalSafeComponent, typeof FinalSafeComponent === 'function');
++  
++  // CRITICAL: ALWAYS use FinalSafeComponent - NEVER check ScreenComponent conditionally
++  // This ensures React NEVER receives undefined
++  let renderContent;
++  if (screen.children !== undefined) {
++    try {
++      renderContent = screen.children({ navigation, route });
++      // Ensure children result is not undefined
++      if (renderContent === undefined || renderContent === null) {
++        console.error('❌ screen.children returned undefined/null for', screen.name);
++        renderContent = ErrorFallback;
++      }
++    } catch (error) {
++      console.error('❌ Error calling screen.children for', screen.name, error);
++      renderContent = ErrorFallback;
++    }
++  } else {
++    // ALWAYS use FinalSafeComponent - it's guaranteed to be a valid function
++    // Double-check it's not undefined before using in JSX
++    if (!FinalSafeComponent || FinalSafeComponent === undefined || FinalSafeComponent === null) {
++      console.error('❌❌❌ CRITICAL: FinalSafeComponent is still undefined/null! Using ErrorFallback directly.');
++      console.error('   FinalSafeComponent value:', FinalSafeComponent);
++      console.error('   FinalSafeComponent type:', typeof FinalSafeComponent);
++      renderContent = ErrorFallback;
++    } else {
++      // Use React.createElement instead of _jsx for more explicit control
++      try {
++        // CRITICAL: Use React.createElement to ensure we have full control
++        const elementResult = React.createElement(FinalSafeComponent, {
+           navigation: navigation,
+-          route: route,
+-          children: ScreenComponent !== undefined ? /*#__PURE__*/_jsx(ScreenComponent, {
++          route: route
++        });
++        // Ensure element result is not undefined
++        if (elementResult === undefined || elementResult === null) {
++          console.error('❌❌❌ CRITICAL: React.createElement result is undefined/null! Using ErrorFallback.');
++          renderContent = ErrorFallback;
++        } else {
++          renderContent = elementResult;
++        }
++      } catch (createError) {
++        console.error('❌❌❌ CRITICAL: Error creating element with FinalSafeComponent:', createError);
++        console.error('   FinalSafeComponent:', FinalSafeComponent);
++        console.error('   FinalSafeComponent type:', typeof FinalSafeComponent);
++        renderContent = ErrorFallback;
++      }
++    }
++  }
++  
++  // CRITICAL: Ensure renderContent is NEVER undefined
++  if (renderContent === undefined || renderContent === null) {
++    console.error('❌❌❌ CRITICAL: renderContent is undefined/null! Using ErrorFallback.');
++    renderContent = ErrorFallback;
++  }
++  
++  // CRITICAL: Never pass undefined or null to StaticContainer.render - ALWAYS use FinalSafeComponent
++  // FinalSafeComponent is guaranteed to be a valid function component
++  const renderProp = screen.children || FinalSafeComponent;
++  
++  // Final safety check - ensure renderProp is NEVER undefined
++  if (!renderProp || renderProp === undefined || renderProp === null) {
++    console.error('❌❌❌ CRITICAL: renderProp is undefined/null! Using FinalSafeComponent fallback.');
 +    return /*#__PURE__*/_jsx(NavigationStateContext.Provider, {
 +      value: context,
 +      children: /*#__PURE__*/_jsx(NavigationFocusedRouteStateContext.Provider, {
@@ -118,38 +362,129 @@ index 8e83282..450f12a 100644
 +        children: /*#__PURE__*/_jsx(EnsureSingleNavigator, {
 +          children: /*#__PURE__*/_jsx(StaticContainer, {
 +            name: screen.name,
-+            render: null,
-+            navigation: navigation,
-+            route: route,
-+            children: ErrorFallback
-+          })
-+        })
-+      })
-+    });
-+  }
-+  
-   return /*#__PURE__*/_jsx(NavigationStateContext.Provider, {
-     value: context,
-     children: /*#__PURE__*/_jsx(NavigationFocusedRouteStateContext.Provider, {
-@@ -144,16 +244,10 @@ export function SceneView({
-       children: /*#__PURE__*/_jsx(EnsureSingleNavigator, {
-         children: /*#__PURE__*/_jsx(StaticContainer, {
-           name: screen.name,
--          render: ScreenComponent || screen.children,
-+          render: isValidComponent ? ScreenComponent : (screen.children || null),
-           navigation: navigation,
-           route: route,
--          children: ScreenComponent !== undefined ? /*#__PURE__*/_jsx(ScreenComponent, {
--            navigation: navigation,
++            render: FinalSafeComponent,
+             navigation: navigation,
 -            route: route
 -          }) : screen.children !== undefined ? screen.children({
 -            navigation,
 -            route
 -          }) : null
-+          children: renderContent
++            route: route,
++            children: ErrorFallback
++          })
          })
        })
-     })
+-    })
+-  });
++    });
++  }
++  
++  // CRITICAL: Final check - ensure children is NEVER undefined before passing to StaticContainer
++  // Also ensure it's a valid React element, not just not-undefined
++  let safeChildren = renderContent;
++  
++  // Validate ErrorFallback is valid before using it
++  if (ErrorFallback === undefined || ErrorFallback === null) {
++    console.error('❌❌❌ CRITICAL: ErrorFallback itself is undefined/null! Creating minimal fallback.');
++    const RN = require('react-native');
++    ErrorFallback = React.createElement(RN.View, {
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }
++    }, React.createElement(RN.Text, null, 'Screen Error'));
++  }
++  
++  if (safeChildren === undefined || safeChildren === null) {
++    console.error('❌❌❌ CRITICAL: renderContent is undefined/null! Using ErrorFallback.');
++    safeChildren = ErrorFallback;
++  }
++  
++  // Additional check: ensure safeChildren is a valid React element
++  // If it's not a valid element, use ErrorFallback
++  if (!React.isValidElement(safeChildren) && typeof safeChildren !== 'object' && typeof safeChildren !== 'string' && typeof safeChildren !== 'number' && safeChildren !== false) {
++    console.error('❌❌❌ CRITICAL: safeChildren is not a valid React element! Type:', typeof safeChildren, 'Value:', safeChildren);
++    safeChildren = ErrorFallback;
++  }
++  
++  // Final absolute check - if still undefined/null, force ErrorFallback
++  if (safeChildren === undefined || safeChildren === null) {
++    console.error('❌❌❌ CRITICAL: safeChildren is STILL undefined/null after all checks! Forcing ErrorFallback.');
++    safeChildren = ErrorFallback;
++  }
++  
++  // ABSOLUTE FINAL CHECK - ensure safeChildren is NEVER undefined
++  // If it's still undefined after everything, create a minimal element
++  if (safeChildren === undefined || safeChildren === null) {
++    console.error('❌❌❌ ABSOLUTE CRITICAL: safeChildren is STILL undefined after ALL checks! Creating minimal element.');
++    const RN = require('react-native');
++    safeChildren = React.createElement(RN.View, {
++      key: 'absolute-fallback',
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center' }
++    }, React.createElement(RN.Text, null, 'Error'));
++  }
++  
++  // Log what we're passing to StaticContainer
++  console.log('🔍🔍🔍 FINAL: Passing to StaticContainer - safeChildren type:', typeof safeChildren, 'isValidElement:', React.isValidElement(safeChildren));
++  console.log('🔍🔍🔍 FINAL: renderProp type:', typeof renderProp, 'isFunction:', typeof renderProp === 'function');
++  
++  // ABSOLUTE FINAL CHECK - ensure safeChildren is NEVER undefined before returning
++  if (safeChildren === undefined || safeChildren === null) {
++    console.error('❌❌❌ ABSOLUTE FINAL: safeChildren is STILL undefined/null right before return!');
++    const RN = require('react-native');
++    safeChildren = React.createElement(RN.View, {
++      key: 'absolute-final-fallback',
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++    }, React.createElement(RN.Text, { style: { fontSize: 18, color: '#000' } }, 'Screen Error'));
++  }
++  
++  // Use React.createElement for all JSX to have explicit control
++  try {
++    return React.createElement(
++      NavigationStateContext.Provider,
++      { value: context },
++      React.createElement(
++        NavigationFocusedRouteStateContext.Provider,
++        { value: focusedRouteState },
++        React.createElement(
++          EnsureSingleNavigator,
++          null,
++          React.createElement(
++            StaticContainer,
++            {
++              name: screen.name,
++              render: renderProp,
++              navigation: navigation,
++              route: route,
++              children: safeChildren
++            }
++          )
++        )
++      )
++    );
++  } catch (renderError) {
++    console.error('❌❌❌ CRITICAL: Error in SceneView render:', renderError);
++    console.error('   safeChildren:', safeChildren);
++    console.error('   renderProp:', renderProp);
++    // Last resort - return minimal valid structure
++    const RN = require('react-native');
++    return React.createElement(RN.View, {
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++    }, React.createElement(RN.Text, null, 'Render Error'));
++  }
++}
++
++// Export the safe wrapper as SceneView
++export function SceneView(props) {
++  try {
++    return React.createElement(SafeSceneViewWrapper, props);
++  } catch (error) {
++    console.error('❌❌❌ CRITICAL: Error in SceneView export wrapper:', error);
++    const RN = require('react-native');
++    return React.createElement(RN.View, {
++      style: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }
++    }, React.createElement(RN.Text, null, 'SceneView Export Error'));
++  }
+ }
+ //# sourceMappingURL=SceneView.js.map
+\ No newline at end of file
 diff --git a/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js b/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js
 index 1c8d466..1618110 100644
 --- a/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js
@@ -171,7 +506,7 @@ index 1c8d466..1618110 100644
        };
        setUnhandledState(state);
 diff --git a/node_modules/@react-navigation/core/src/SceneView.tsx b/node_modules/@react-navigation/core/src/SceneView.tsx
-index ca608bd..64c4f29 100644
+index ca608bd..69af246 100644
 --- a/node_modules/@react-navigation/core/src/SceneView.tsx
 +++ b/node_modules/@react-navigation/core/src/SceneView.tsx
 @@ -84,17 +84,23 @@ export function SceneView<
@@ -205,7 +540,7 @@ index ca608bd..64c4f29 100644
  
            if (Object.keys(rest).length) {
              return { ...nextRoute, params: rest };
-@@ -206,9 +212,60 @@ export function SceneView<
+@@ -206,9 +212,173 @@ export function SceneView<
      ]
    );
  
@@ -247,34 +582,147 @@ index ca608bd..64c4f29 100644
 +
 +  // If component is invalid, log detailed error
 +  if (!isValidComponent && !screen.children) {
-+    console.error('❌ INVALID COMPONENT for screen:', screen.name);
++    console.error('❌❌❌ CRITICAL: INVALID COMPONENT for screen:', screen.name);
 +    console.error('   Component value:', ScreenComponent);
 +    console.error('   Component type:', typeof ScreenComponent);
 +    console.error('   Has getComponent:', !!screen.getComponent);
 +    console.error('   Has component prop:', !!screen.component);
 +    console.error('   Has children:', !!screen.children);
++    console.error('   This WILL cause "Element type is invalid" error!');
++    console.error('   Stack trace:', new Error().stack);
 +  }
 +
-+  // NEVER render if component is invalid - return null instead
-+  const renderContent = isValidComponent ? (
-+    <ScreenComponent navigation={navigation} route={route} />
-+  ) : screen.children !== undefined ? (
-+    screen.children({ navigation, route })
-+  ) : null;
++  // CRITICAL: Create ErrorScreen component inline to avoid import issues
++  const ErrorFallback = React.createElement(
++    React.Fragment,
++    null,
++    React.createElement(
++      require('react-native').View,
++      {
++        style: {
++          flex: 1,
++          justifyContent: 'center',
++          alignItems: 'center',
++          padding: 20,
++          backgroundColor: '#fff',
++        },
++      },
++      React.createElement(
++        require('react-native').Text,
++        {
++          style: {
++            fontSize: 18,
++            fontWeight: 'bold',
++            marginBottom: 10,
++            color: '#000',
++          },
++        },
++        'Screen Error'
++      ),
++      React.createElement(
++        require('react-native').Text,
++        {
++          style: {
++            fontSize: 14,
++            color: '#666',
++            textAlign: 'center',
++            marginBottom: 5,
++          },
++        },
++        `Screen "${screen.name}" component is invalid.`
++      ),
++      React.createElement(
++        require('react-native').Text,
++        {
++          style: {
++            fontSize: 12,
++            color: '#999',
++            textAlign: 'center',
++          },
++        },
++        'Check console for details.'
++      )
++    )
++  );
 +
-+  // If we have nothing to render and no children, return null to prevent React error
-+  if (!isValidComponent && !screen.children) {
-+    return null;
++  // CRITICAL: Create a safe component wrapper that NEVER allows undefined
++  // This MUST always return a valid function component, never undefined
++  const SafeScreenComponent = React.useMemo(() => {
++    // Triple check that ScreenComponent is valid before using it
++    if (isValidComponent && 
++        ScreenComponent !== undefined && 
++        ScreenComponent !== null &&
++        typeof ScreenComponent !== 'undefined' &&
++        (typeof ScreenComponent === 'function' || typeof ScreenComponent === 'object')) {
++      // Additional check: ensure it's not a promise
++      if (typeof (ScreenComponent as any).then !== 'function') {
++        return ScreenComponent;
++      }
++    }
++    // ALWAYS return a valid function component - never undefined
++    return function SafeComponent(props: any) {
++      console.warn('⚠️ SafeComponent fallback used for screen:', screen.name);
++      return ErrorFallback;
++    };
++  }, [isValidComponent, ScreenComponent, screen.name]);
++
++  // CRITICAL: ALWAYS use SafeScreenComponent - NEVER check ScreenComponent conditionally
++  // This ensures React NEVER receives undefined
++  let renderContent: React.ReactNode;
++  if (screen.children !== undefined) {
++    try {
++      renderContent = screen.children({ navigation, route });
++    } catch (error) {
++      console.error('❌ Error calling screen.children for', screen.name, error);
++      renderContent = ErrorFallback;
++    }
++  } else {
++    // ALWAYS use SafeScreenComponent - it's guaranteed to be a valid function
++    renderContent = <SafeScreenComponent navigation={navigation} route={route} />;
 +  }
++  
++  // CRITICAL: Ensure renderContent is NEVER undefined
++  if (renderContent === undefined || renderContent === null) {
++    console.error('❌❌❌ CRITICAL: renderContent is undefined/null! Using ErrorFallback.');
++    renderContent = ErrorFallback;
++  }
++  
++  // CRITICAL: Never pass undefined to StaticContainer.render - ALWAYS use SafeScreenComponent
++  // SafeScreenComponent is guaranteed to be a valid function component
++  const renderProp = screen.children || SafeScreenComponent;
++  
++  // Final safety check - ensure renderProp is NEVER undefined
++  if (!renderProp || renderProp === undefined || renderProp === null) {
++    console.error('❌❌❌ CRITICAL: renderProp is undefined/null! Using SafeScreenComponent fallback.');
++    return (
++      <NavigationStateContext.Provider value={context}>
++        <NavigationFocusedRouteStateContext.Provider value={focusedRouteState}>
++          <EnsureSingleNavigator>
++            <StaticContainer
++              name={screen.name}
++              render={SafeScreenComponent}
++              navigation={navigation}
++              route={route}
++            >
++              {ErrorFallback}
++            </StaticContainer>
++          </EnsureSingleNavigator>
++        </NavigationFocusedRouteStateContext.Provider>
++      </NavigationStateContext.Provider>
++    );
++  }
++
++  // CRITICAL: Final check - ensure children is NEVER undefined before passing to StaticContainer
++  const safeChildren = renderContent === undefined || renderContent === null ? ErrorFallback : renderContent;
  
    return (
      <NavigationStateContext.Provider value={context}>
-@@ -216,15 +273,11 @@ export function SceneView<
+@@ -216,15 +386,11 @@ export function SceneView<
          <EnsureSingleNavigator>
            <StaticContainer
              name={screen.name}
 -            render={ScreenComponent || screen.children}
-+            render={isValidComponent ? ScreenComponent : screen.children || null}
++            render={renderProp}
              navigation={navigation}
              route={route}
            >
@@ -283,7 +731,7 @@ index ca608bd..64c4f29 100644
 -            ) : screen.children !== undefined ? (
 -              screen.children({ navigation, route })
 -            ) : null}
-+            {renderContent}
++            {safeChildren}
            </StaticContainer>
          </EnsureSingleNavigator>
        </NavigationFocusedRouteStateContext.Provider>

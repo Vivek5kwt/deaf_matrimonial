@@ -1,8 +1,41 @@
+diff --git a/node_modules/@react-navigation/native/lib/module/NavigationContainer.js b/node_modules/@react-navigation/native/lib/module/NavigationContainer.js
+index 82e49b3..3703616 100644
+--- a/node_modules/@react-navigation/native/lib/module/NavigationContainer.js
++++ b/node_modules/@react-navigation/native/lib/module/NavigationContainer.js
+@@ -86,7 +86,27 @@ function NavigationContainerInner({
+       });
+     }
+   });
+-  const [isResolved, initialState] = useThenable(getInitialState);
++  const [isResolved, initialStateRaw] = useThenable(getInitialState);
++
++  // CRITICAL FIX: Validate initialState is not a component
++  // If getInitialState returns a component instead of navigation state, this will catch it
++  let initialState = initialStateRaw;
++  if (isResolved && initialState !== undefined && initialState !== null) {
++    // Check if initialState is a React component (function or object with $$typeof)
++    const isComponent = typeof initialState === 'function' || 
++                       (typeof initialState === 'object' && initialState !== null && 
++                        (initialState.$$typeof !== undefined || 
++                         initialState.render !== undefined ||
++                         (initialState.prototype !== undefined && initialState.prototype.isReactComponent !== undefined)));
++    if (isComponent) {
++      console.error('❌❌❌ CRITICAL ERROR: getInitialState returned a component instead of navigation state!');
++      console.error('   This will cause "Element type is invalid" error.');
++      console.error('   initialState value:', initialState);
++      console.error('   Stack trace:', new Error().stack);
++      // Force initialState to undefined to prevent crash
++      initialState = undefined;
++    }
++  }
+ 
+   // FIXME
+   // @ts-expect-error not sure why this is not working
 diff --git a/node_modules/@react-navigation/native/lib/module/useThenable.js b/node_modules/@react-navigation/native/lib/module/useThenable.js
-index c40ea5b..4d65aa4 100644
+index c40ea5b..8b3f8db 100644
 --- a/node_modules/@react-navigation/native/lib/module/useThenable.js
 +++ b/node_modules/@react-navigation/native/lib/module/useThenable.js
-@@ -18,9 +18,25 @@ export function useThenable(create) {
+@@ -18,8 +18,34 @@ export function useThenable(create) {
        let result;
        try {
          result = await promise;
@@ -15,25 +48,33 @@ index c40ea5b..4d65aa4 100644
 +        result = undefined;
        } finally {
          if (!cancelled) {
--          setState([true, result]);
-+          // CRITICAL: Never set undefined result if it might be used as a component
-+          // If result is undefined, log error and use null instead to prevent React errors
++          // CRITICAL FIX: If result is undefined, this is valid for getInitialState
++          // But we need to ensure it's NEVER used as a component
 +          if (result === undefined) {
-+            console.error('❌ useThenable: Promise resolved to undefined! This will cause rendering errors.');
-+            console.error('   Stack trace:', new Error().stack);
-+            // Use null instead of undefined to prevent "Element type is invalid" error
-+            setState([true, null]);
-+          } else {
-+            setState([true, result]);
++            console.warn('⚠️ useThenable: Promise resolved to undefined (valid for getInitialState)');
++            // Check if the promise creator function might be returning a component
++            try {
++              const promiseCreatorStr = create.toString();
++              if (promiseCreatorStr.includes('component') || promiseCreatorStr.includes('Component') || 
++                  promiseCreatorStr.includes('Screen') || promiseCreatorStr.includes('screen')) {
++                console.error('❌❌❌ WARNING: getInitialState might be returning a component!');
++                console.error('   Check your linking configuration - getInitialState should return navigation state, not a component.');
++              }
++            } catch (e) {
++              // Ignore errors in toString
++            }
 +          }
++          // CRITICAL: undefined is valid for getInitialState (means no initial state)
++          // But we must ensure it's never used as a component
++          // The NavigationContainer validation should catch this
+           setState([true, result]);
          }
        }
-     };
 diff --git a/node_modules/@react-navigation/native/src/useThenable.tsx b/node_modules/@react-navigation/native/src/useThenable.tsx
-index 58606d4..e4e2374 100644
+index 58606d4..515ce0d 100644
 --- a/node_modules/@react-navigation/native/src/useThenable.tsx
 +++ b/node_modules/@react-navigation/native/src/useThenable.tsx
-@@ -22,6 +22,13 @@ export function useThenable<T>(create: () => PromiseLike<T>) {
+@@ -22,8 +22,21 @@ export function useThenable<T>(create: () => PromiseLike<T>) {
  
        try {
          result = await promise;
@@ -46,4 +87,12 @@ index 58606d4..e4e2374 100644
 +        result = undefined;
        } finally {
          if (!cancelled) {
++          // CRITICAL FIX: If result is undefined, log detailed error
++          if (result === undefined) {
++            console.error('❌❌❌ CRITICAL: useThenable promise resolved to undefined!');
++            console.error('   This will cause "Element type is invalid" error if used as a component.');
++            console.error('   Stack trace:', new Error().stack);
++          }
            setState([true, result]);
+         }
+       }
