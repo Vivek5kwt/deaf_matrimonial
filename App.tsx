@@ -146,35 +146,47 @@ const ErrorScreen = ({ screenName }) => {
   );
 };
 
+const resolveComponent = (Component, screenName) => {
+  if (Component && typeof Component === 'object' && Component.default) {
+    const resolved = Component.default;
+    if (resolved) {
+      console.warn(`⚠️ Screen "${screenName}" imported as a module object. Using default export instead.`);
+      return resolved;
+    }
+  }
+  return Component;
+};
+
 // Helper function to validate and wrap components
 const validateComponent = (Component, screenName) => {
+  const ResolvedComponent = resolveComponent(Component, screenName);
   // CRITICAL: Check for undefined/null first
-  if (Component === undefined || Component === null) {
-    console.error(`❌❌❌ Component for screen "${screenName}" is ${Component === undefined ? 'undefined' : 'null'}!`);
+  if (ResolvedComponent === undefined || ResolvedComponent === null) {
+    console.error(`❌❌❌ Component for screen "${screenName}" is ${ResolvedComponent === undefined ? 'undefined' : 'null'}!`);
     console.error(`   This will cause "Element type is invalid" error.`);
     console.error(`   Check the import statement for ${screenName}`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   
   // Check if it's a promise (thenable) - this is CRITICAL
-  if (typeof Component.then === 'function') {
+  if (typeof ResolvedComponent.then === 'function') {
     console.error(`❌❌❌ Component for screen "${screenName}" is a promise (thenable). This is not supported!`);
     console.error(`   Components must be loaded synchronously, not via promises.`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   
-  if (typeof Component !== 'function' && typeof Component !== 'object') {
-    console.error(`❌ Component for screen "${screenName}" is invalid type:`, typeof Component);
+  if (typeof ResolvedComponent !== 'function' && typeof ResolvedComponent !== 'object') {
+    console.error(`❌ Component for screen "${screenName}" is invalid type:`, typeof ResolvedComponent);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   
   // Final check: ensure it's not undefined after all checks
-  if (Component === undefined || Component === null) {
+  if (ResolvedComponent === undefined || ResolvedComponent === null) {
     console.error(`❌❌❌ Component for screen "${screenName}" became undefined after validation!`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   
-  return Component;
+  return ResolvedComponent;
 };
 
 // Validate all screen components
@@ -300,15 +312,16 @@ const withSafeRouteParams = (Component) => {
 
 // Helper to ensure component is never undefined when passed to Stack.Screen
 const ensureValidComponent = (component, screenName) => {
-  if (!component) {
-    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is ${component === undefined ? 'undefined' : 'null'} when creating Stack.Screen!`);
+  const resolved = resolveComponent(component, screenName);
+  if (!resolved) {
+    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is ${resolved === undefined ? 'undefined' : 'null'} when creating Stack.Screen!`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
-  if (typeof component !== 'function' && typeof component !== 'object') {
-    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" has invalid type: ${typeof component}`);
+  if (typeof resolved !== 'function' && typeof resolved !== 'object') {
+    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" has invalid type: ${typeof resolved}`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
-  return component;
+  return resolved;
 };
 
 const AppNavigator = ({ navigationRef }) => {
