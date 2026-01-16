@@ -1,8 +1,8 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import RecentChats from '../components/Chat/RecentChats';
-import ActiveChats from '../components/Chat/ActiveChats';
-import CallScreen from '../components/Chat/Calls';
+import RecentScreen from '../screens/view/chat/RecentScreen.tsx';
+import ActiveScreen from '../screens/view/chat/ActiveScreen.tsx';
+import CallsScreen from '../screens/view/chat/CallsScreen.tsx';
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -15,9 +15,9 @@ export default function TabNavigator() {
         tabBarLabelStyle: { fontSize: 14, textTransform: 'none' },
       }}
     >
-      <Tab.Screen name="Recent" component={RecentChats} />
-      <Tab.Screen name="Active" component={ActiveChats} />
-      <Tab.Screen name="Calls" component={CallScreen} />
+      <Tab.Screen name="Recent" component={RecentScreen} />
+      <Tab.Screen name="Active" component={ActiveScreen} />
+      <Tab.Screen name="Calls" component={CallsScreen} />
     </Tab.Navigator>
   );
 }
