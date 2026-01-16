@@ -45,7 +45,7 @@ import Screen30 from "./src/screens/view/login/pages/home/pages/Daily"; //One Wa
 import Screen32 from "./src/screens/view/login/pages/home/View/ReasonForReporting"
 import Screen34 from "./src/screens/view/chat/ActiveScreen"
 import Screen35 from "./src/screens/view/chat/CallsScreen"//free
-import Screen33 from "./src/screens/view/chat/RecentScreen.tsx" //chat live screen
+import Screen33 from "./src/screens/view/chat/RecentScreen" //chat live screen
 import Screen36 from "./src/screens/view/MatchesScreen/MatchesScreen.tsx"//Free
 import Screen37 from "./src/screens/view/ShortlistedScreen/ShortlistedScreen.tsx" //custom matches
 import Screen38 from "./src/screens/view/RecentlyViewedScreen/RecentlyViewedScreen.tsx" //free

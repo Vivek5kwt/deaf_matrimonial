@@ -1,6 +1,6 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import RecentScreen from '../screens/view/chat/RecentScreen.tsx';
+import RecentScreen from '../screens/view/chat/RecentScreen';
 import ActiveScreen from '../screens/view/chat/ActiveScreen.tsx';
 import CallsScreen from '../screens/view/chat/CallsScreen.tsx';
 
