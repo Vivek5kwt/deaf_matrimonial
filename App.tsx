@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -326,17 +326,38 @@ const withSafeRouteParams = (Component) => {
 
 // Helper to ensure component is never undefined when passed to Stack.Screen
 const ensureValidComponent = (component, screenName) => {
-  const resolved = resolveComponent(component, screenName);
-  if (!resolved) {
-    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is ${resolved === undefined ? 'undefined' : 'null'} when creating Stack.Screen!`);
+  try {
+    const resolved = resolveComponent(component, screenName);
+    if (!resolved) {
+      console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is ${resolved === undefined ? 'undefined' : 'null'} when creating Stack.Screen!`);
+      console.error(`   Original component:`, component);
+      return (props) => <ErrorScreen screenName={screenName} />;
+    }
+    if (!isValidComponentType(resolved)) {
+      console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is not a valid React component.`);
+      console.error(`   Type: ${typeof resolved}`);
+      console.error(`   Value:`, resolved);
+      return (props) => <ErrorScreen screenName={screenName} />;
+    }
+    // Wrap component to catch render errors
+    const WrappedComponent = (props) => {
+      try {
+        if (!resolved) {
+          console.error(`❌❌❌ Component "${screenName}" became undefined during render!`);
+          return <ErrorScreen screenName={screenName} />;
+        }
+        return React.createElement(resolved, props);
+      } catch (error) {
+        console.error(`❌❌❌ Error rendering screen "${screenName}":`, error);
+        return <ErrorScreen screenName={screenName} />;
+      }
+    };
+    WrappedComponent.displayName = `Wrapped(${screenName})`;
+    return WrappedComponent;
+  } catch (error) {
+    console.error(`❌❌❌ Error validating component "${screenName}":`, error);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
-  if (!isValidComponentType(resolved)) {
-    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is not a valid React component.`);
-    console.error(`   Type: ${typeof resolved}`);
-    return (props) => <ErrorScreen screenName={screenName} />;
-  }
-  return resolved;
 };
 
 const AppNavigator = ({ navigationRef }) => {
@@ -344,31 +365,110 @@ const AppNavigator = ({ navigationRef }) => {
   console.log('🔍🔍🔍 RUNTIME VALIDATION: Checking all screen components...');
   const screenNames = Object.keys(validatedScreens);
   let hasInvalidComponents = false;
+  const invalidScreens: string[] = [];
   screenNames.forEach(name => {
     const comp = validatedScreens[name];
     if (comp === undefined || comp === null) {
       console.error(`❌❌❌ CRITICAL: Screen "${name}" is ${comp === undefined ? 'undefined' : 'null'}!`);
       console.error(`   This WILL cause "Element type is invalid" error!`);
+      console.error(`   Stack trace:`, new Error().stack);
+      invalidScreens.push(name);
       hasInvalidComponents = true;
     } else if (!isValidComponentType(comp)) {
       console.error(`❌❌❌ CRITICAL: Screen "${name}" is not a valid React component.`);
       console.error(`   Type: ${typeof comp}`);
       console.error(`   Value:`, comp);
+      invalidScreens.push(name);
       hasInvalidComponents = true;
     } else if (typeof comp.then === 'function') {
       console.error(`❌❌❌ CRITICAL: Screen "${name}" is a promise (thenable)!`);
       console.error(`   Components must be loaded synchronously!`);
+      invalidScreens.push(name);
       hasInvalidComponents = true;
     }
   });
   
   if (hasInvalidComponents) {
     console.error('❌❌❌ CRITICAL: One or more screen components are invalid!');
+    console.error(`   Invalid screens: ${invalidScreens.join(', ')}`);
     console.error('   The app may crash with "Element type is invalid" error.');
     console.error('   Check the console above to see which screens are problematic.');
   } else {
     console.log('✅✅✅ All screen components validated successfully!');
   }
+
+  // Pre-compute all screen components to avoid IIFE issues
+  // Use Record type with explicit assertion to ensure TypeScript recognizes all properties
+  const screenComponents = {} as Record<string, React.ComponentType<any>>;
+  screenNames.forEach(name => {
+    try {
+      const comp = ensureValidComponent(validatedScreens[name], name);
+      if (comp && (typeof comp === 'function' || typeof comp === 'object')) {
+        screenComponents[name] = comp;
+      } else {
+        console.error(`❌ Failed to create component for "${name}", using ErrorScreen`);
+        screenComponents[name] = (props: any) => <ErrorScreen screenName={name} />;
+      }
+    } catch (error) {
+      console.error(`❌ Error creating component for "${name}":`, error);
+      screenComponents[name] = (props: any) => <ErrorScreen screenName={name} />;
+    }
+  });
+  
+  // Handle special screen name mappings
+  screenComponents.SuccessStories = screenComponents.SuccessStoriesScreen || ((props: any) => <ErrorScreen screenName="SuccessStories" />);
+  screenComponents.AddSuccessStory = screenComponents.AddSuccessStoryScreen || ((props: any) => <ErrorScreen screenName="AddSuccessStory" />);
+  
+  // Helper function to get component with proper typing and validation
+  const getScreenComponent = (name: string): React.ComponentType<any> => {
+    const component = screenComponents[name];
+    if (!component || component === undefined || component === null) {
+      console.error(`❌❌❌ CRITICAL: Component "${name}" is ${component === undefined ? 'undefined' : component === null ? 'null' : 'falsy'}!`);
+      console.error(`   Available keys:`, Object.keys(screenComponents));
+      console.error(`   Stack trace:`, new Error().stack);
+      // Return a valid component that will render an error screen
+      const ErrorComponent = (props: any) => <ErrorScreen screenName={name} />;
+      ErrorComponent.displayName = `ErrorScreen(${name})`;
+      return ErrorComponent;
+    }
+    if (typeof component !== 'function' && typeof component !== 'object') {
+      console.error(`❌❌❌ CRITICAL: Component "${name}" is not a valid React component. Type: ${typeof component}`);
+      const ErrorComponent = (props: any) => <ErrorScreen screenName={name} />;
+      ErrorComponent.displayName = `ErrorScreen(${name})`;
+      return ErrorComponent;
+    }
+    // Double-check it's still valid
+    if (component === undefined || component === null) {
+      console.error(`❌❌❌ CRITICAL: Component "${name}" became invalid after validation!`);
+      const ErrorComponent = (props: any) => <ErrorScreen screenName={name} />;
+      ErrorComponent.displayName = `ErrorScreen(${name})`;
+      return ErrorComponent;
+    }
+    return component;
+  };
+  
+  // Log all screen components for debugging and validate they're all defined
+  console.log('📋 Screen components initialized:', Object.keys(screenComponents).length);
+  const undefinedScreens: string[] = [];
+  Object.keys(screenComponents).forEach(name => {
+    const comp = screenComponents[name];
+    if (!comp || comp === undefined || comp === null) {
+      console.error(`❌ Screen "${name}" is invalid:`, comp);
+      undefinedScreens.push(name);
+    }
+  });
+  if (undefinedScreens.length > 0) {
+    console.error(`❌❌❌ CRITICAL: ${undefinedScreens.length} screens are undefined:`, undefinedScreens);
+  }
+  
+  // Validate all required screens exist before rendering
+  const requiredScreens = ['Screen1', 'Screen2', 'Screen3'];
+  requiredScreens.forEach(name => {
+    if (!screenComponents[name]) {
+      console.error(`❌❌❌ CRITICAL: Required screen "${name}" is missing!`);
+      screenComponents[name] = (props: any) => <ErrorScreen screenName={name} />;
+    }
+  });
 
   return (
     <NavigationContainer
@@ -387,283 +487,82 @@ const AppNavigator = ({ navigationRef }) => {
       <Stack.Navigator
         initialRouteName="Screen1"
         screenOptions={{
-          headerBackTitleVisible: false,
+          headerBackTitle: '',
         }}
       >
       <Stack.Screen
         name="Screen1"
-        component={(() => {
-          const comp = ensureValidComponent(validatedScreens.Screen1, 'Screen1');
-          return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen1" /> : comp;
-        })()}
+        component={screenComponents['Screen1'] || ((props: any) => <ErrorScreen screenName="Screen1" />)}
         options={{ headerShown: false }}
         initialParams={{}}
       />
-      {/* CRITICAL: Wrap all screen components with runtime validation */}
-      <Stack.Screen name="Screen2" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen2, 'Screen2');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen2" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen3" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen3, 'Screen3');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen3" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen4" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen4, 'Screen4');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen4" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen5" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen5, 'Screen5');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen5" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen6" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen6, 'Screen6');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen6" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen7" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen7, 'Screen7');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen7" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen8" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen8, 'Screen8');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen8" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen9" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen9, 'Screen9');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen9" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen10" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen10, 'Screen10');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen10" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen11" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen11, 'Screen11');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen11" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen12" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen12, 'Screen12');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen12" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen13" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen13, 'Screen13');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen13" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen14" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen14, 'Screen14');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen14" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen15" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen15, 'Screen15');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen15" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen16" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen16, 'Screen16');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen16" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen17" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen17, 'Screen17');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen17" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen21" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen21, 'Screen21');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen21" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen26" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen26, 'Screen26');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen26" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen27" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen27, 'Screen27');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen27" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen28" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen28, 'Screen28');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen28" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen29" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen29, 'Screen29');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen29" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen30" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen30, 'Screen30');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen30" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen32" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen32, 'Screen32');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen32" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen33" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen33, 'Screen33');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen33" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen34" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen34, 'Screen34');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen34" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen35" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen35, 'Screen35');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen35" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen36" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen36, 'Screen36');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen36" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen37" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen37, 'Screen37');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen37" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen38" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen38, 'Screen38');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen38" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen39" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen39, 'Screen39');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen39" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen40" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen40, 'Screen40');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen40" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen41" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen41, 'Screen41');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen41" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen42" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen42, 'Screen42');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen42" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen43" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen43, 'Screen43');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen43" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen44" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen44, 'Screen44');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen44" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen45" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen45, 'Screen45');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen45" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen46" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen46, 'Screen46');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen46" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen47" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen47, 'Screen47');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen47" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen48" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen48, 'Screen48');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen48" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen50" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen50, 'Screen50');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen50" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen51" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen51, 'Screen51');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen51" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen52" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen52, 'Screen52');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen52" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen53" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen53, 'Screen53');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen53" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen54" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen54, 'Screen54');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen54" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen56" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen56, 'Screen56');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen56" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen57" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen57, 'Screen57');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen57" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen58" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen58, 'Screen58');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen58" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen59" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen59, 'Screen59');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen59" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen60" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen60, 'Screen60');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen60" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen61" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen61, 'Screen61');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen61" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen62" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen62, 'Screen62');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen62" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen63" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen63, 'Screen63');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen63" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen64" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen64, 'Screen64');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen64" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen65" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen65, 'Screen65');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen65" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen66" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen66, 'Screen66');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen66" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen67" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen67, 'Screen67');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen67" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen68" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen68, 'Screen68');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen68" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen69" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen69, 'Screen69');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen69" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="Screen70" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.Screen70, 'Screen70');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="Screen70" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="SearchResultsScreen" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.SearchResultsScreen, 'SearchResultsScreen');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="SearchResultsScreen" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="SuccessStories" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.SuccessStoriesScreen, 'SuccessStories');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="SuccessStories" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="AddSuccessStory" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.AddSuccessStoryScreen, 'AddSuccessStory');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="AddSuccessStory" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="NotificationBell" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.NotificationBell, 'NotificationBell');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="NotificationBell" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="CCAvenuePaymentScreen" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.CCAvenuePaymentScreen, 'CCAvenuePaymentScreen');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="CCAvenuePaymentScreen" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="PaymentStatusScreen" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.PaymentStatusScreen, 'PaymentStatusScreen');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="PaymentStatusScreen" /> : comp;
-      })()} options={{ headerShown: false }} />
-      <Stack.Screen name="PaymentErrorScreen" component={(() => {
-        const comp = ensureValidComponent(validatedScreens.PaymentErrorScreen, 'PaymentErrorScreen');
-        return comp === undefined || comp === null ? (props) => <ErrorScreen screenName="PaymentErrorScreen" /> : comp;
-      })()} options={{ headerShown: false }} /> 
+      {/* CRITICAL: Use pre-computed components directly, not through function calls */}
+      <Stack.Screen name="Screen2" component={screenComponents['Screen2'] || ((props: any) => <ErrorScreen screenName="Screen2" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen3" component={screenComponents['Screen3'] || ((props: any) => <ErrorScreen screenName="Screen3" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen4" component={screenComponents['Screen4'] || ((props: any) => <ErrorScreen screenName="Screen4" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen5" component={screenComponents['Screen5'] || ((props: any) => <ErrorScreen screenName="Screen5" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen6" component={screenComponents['Screen6'] || ((props: any) => <ErrorScreen screenName="Screen6" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen7" component={screenComponents['Screen7'] || ((props: any) => <ErrorScreen screenName="Screen7" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen8" component={screenComponents['Screen8'] || ((props: any) => <ErrorScreen screenName="Screen8" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen9" component={screenComponents['Screen9'] || ((props: any) => <ErrorScreen screenName="Screen9" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen10" component={screenComponents['Screen10'] || ((props: any) => <ErrorScreen screenName="Screen10" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen11" component={screenComponents['Screen11'] || ((props: any) => <ErrorScreen screenName="Screen11" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen12" component={screenComponents['Screen12'] || ((props: any) => <ErrorScreen screenName="Screen12" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen13" component={screenComponents['Screen13'] || ((props: any) => <ErrorScreen screenName="Screen13" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen14" component={screenComponents['Screen14'] || ((props: any) => <ErrorScreen screenName="Screen14" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen15" component={screenComponents['Screen15'] || ((props: any) => <ErrorScreen screenName="Screen15" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen16" component={screenComponents['Screen16'] || ((props: any) => <ErrorScreen screenName="Screen16" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen17" component={screenComponents['Screen17'] || ((props: any) => <ErrorScreen screenName="Screen17" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen21" component={screenComponents['Screen21'] || ((props: any) => <ErrorScreen screenName="Screen21" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen26" component={screenComponents['Screen26'] || ((props: any) => <ErrorScreen screenName="Screen26" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen27" component={screenComponents['Screen27'] || ((props: any) => <ErrorScreen screenName="Screen27" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen28" component={screenComponents['Screen28'] || ((props: any) => <ErrorScreen screenName="Screen28" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen29" component={screenComponents['Screen29'] || ((props: any) => <ErrorScreen screenName="Screen29" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen30" component={screenComponents['Screen30'] || ((props: any) => <ErrorScreen screenName="Screen30" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen32" component={screenComponents['Screen32'] || ((props: any) => <ErrorScreen screenName="Screen32" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen33" component={screenComponents['Screen33'] || ((props: any) => <ErrorScreen screenName="Screen33" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen34" component={screenComponents['Screen34'] || ((props: any) => <ErrorScreen screenName="Screen34" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen35" component={screenComponents['Screen35'] || ((props: any) => <ErrorScreen screenName="Screen35" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen36" component={screenComponents['Screen36'] || ((props: any) => <ErrorScreen screenName="Screen36" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen37" component={screenComponents['Screen37'] || ((props: any) => <ErrorScreen screenName="Screen37" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen38" component={screenComponents['Screen38'] || ((props: any) => <ErrorScreen screenName="Screen38" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen39" component={screenComponents['Screen39'] || ((props: any) => <ErrorScreen screenName="Screen39" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen40" component={screenComponents['Screen40'] || ((props: any) => <ErrorScreen screenName="Screen40" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen41" component={screenComponents['Screen41'] || ((props: any) => <ErrorScreen screenName="Screen41" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen42" component={screenComponents['Screen42'] || ((props: any) => <ErrorScreen screenName="Screen42" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen43" component={screenComponents['Screen43'] || ((props: any) => <ErrorScreen screenName="Screen43" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen44" component={screenComponents['Screen44'] || ((props: any) => <ErrorScreen screenName="Screen44" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen45" component={screenComponents['Screen45'] || ((props: any) => <ErrorScreen screenName="Screen45" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen46" component={screenComponents['Screen46'] || ((props: any) => <ErrorScreen screenName="Screen46" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen47" component={screenComponents['Screen47'] || ((props: any) => <ErrorScreen screenName="Screen47" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen48" component={screenComponents['Screen48'] || ((props: any) => <ErrorScreen screenName="Screen48" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen50" component={screenComponents['Screen50'] || ((props: any) => <ErrorScreen screenName="Screen50" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen51" component={screenComponents['Screen51'] || ((props: any) => <ErrorScreen screenName="Screen51" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen52" component={screenComponents['Screen52'] || ((props: any) => <ErrorScreen screenName="Screen52" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen53" component={screenComponents['Screen53'] || ((props: any) => <ErrorScreen screenName="Screen53" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen54" component={screenComponents['Screen54'] || ((props: any) => <ErrorScreen screenName="Screen54" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen56" component={screenComponents['Screen56'] || ((props: any) => <ErrorScreen screenName="Screen56" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen57" component={screenComponents['Screen57'] || ((props: any) => <ErrorScreen screenName="Screen57" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen58" component={screenComponents['Screen58'] || ((props: any) => <ErrorScreen screenName="Screen58" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen59" component={screenComponents['Screen59'] || ((props: any) => <ErrorScreen screenName="Screen59" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen60" component={screenComponents['Screen60'] || ((props: any) => <ErrorScreen screenName="Screen60" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen61" component={screenComponents['Screen61'] || ((props: any) => <ErrorScreen screenName="Screen61" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen62" component={screenComponents['Screen62'] || ((props: any) => <ErrorScreen screenName="Screen62" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen63" component={screenComponents['Screen63'] || ((props: any) => <ErrorScreen screenName="Screen63" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen64" component={screenComponents['Screen64'] || ((props: any) => <ErrorScreen screenName="Screen64" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen65" component={screenComponents['Screen65'] || ((props: any) => <ErrorScreen screenName="Screen65" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen66" component={screenComponents['Screen66'] || ((props: any) => <ErrorScreen screenName="Screen66" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen67" component={screenComponents['Screen67'] || ((props: any) => <ErrorScreen screenName="Screen67" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen68" component={screenComponents['Screen68'] || ((props: any) => <ErrorScreen screenName="Screen68" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen69" component={screenComponents['Screen69'] || ((props: any) => <ErrorScreen screenName="Screen69" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="Screen70" component={screenComponents['Screen70'] || ((props: any) => <ErrorScreen screenName="Screen70" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="SearchResultsScreen" component={screenComponents['SearchResultsScreen'] || ((props: any) => <ErrorScreen screenName="SearchResultsScreen" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="SuccessStories" component={screenComponents['SuccessStoriesScreen'] || ((props: any) => <ErrorScreen screenName="SuccessStories" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="AddSuccessStory" component={screenComponents['AddSuccessStoryScreen'] || ((props: any) => <ErrorScreen screenName="AddSuccessStory" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="NotificationBell" component={screenComponents['NotificationBell'] || ((props: any) => <ErrorScreen screenName="NotificationBell" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="CCAvenuePaymentScreen" component={screenComponents['CCAvenuePaymentScreen'] || ((props: any) => <ErrorScreen screenName="CCAvenuePaymentScreen" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="PaymentStatusScreen" component={screenComponents['PaymentStatusScreen'] || ((props: any) => <ErrorScreen screenName="PaymentStatusScreen" />)} options={{ headerShown: false }} />
+      <Stack.Screen name="PaymentErrorScreen" component={screenComponents['PaymentErrorScreen'] || ((props: any) => <ErrorScreen screenName="PaymentErrorScreen" />)} options={{ headerShown: false }} /> 
 
 
     </Stack.Navigator>
@@ -673,7 +572,7 @@ const AppNavigator = ({ navigationRef }) => {
 
 const App = (props) => {
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
-  const navigationRef = React.useRef<NavigationContainerRef<any>>(null);
+  const navigationRef = React.useRef<any>(null);
 
 
   // Handle notification taps with deep linking

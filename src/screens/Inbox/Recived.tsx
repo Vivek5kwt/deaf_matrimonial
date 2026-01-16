@@ -10,8 +10,6 @@ import { Snackbar } from 'react-native-paper';
 import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-native-responsive-screen';
 import { getMessaging, onNotificationOpenedApp, getInitialNotification } from '@react-native-firebase/messaging';
 
-const messaging = getMessaging();
-
 interface Message {
     id: number;
     conversation_id: string | null;
@@ -282,18 +280,26 @@ const Screen40 = (props: any) => {
                 }
               };
 
-        // Listen for notification events
-        const unsubscribeForeground = onNotificationOpenedApp(messaging, handleNotification);
+        try {
+          // Get messaging instance inside useEffect to ensure Firebase is initialized
+          const messaging = getMessaging();
+          
+          // Listen for notification events
+          const unsubscribeForeground = onNotificationOpenedApp(messaging, handleNotification);
 
-        // Check if app was opened from a notification
-        getInitialNotification(messaging)
-        .then(notification => {
-          if (notification) {
-            handleNotification(notification.data);
-          }
-        });
-    
-      return unsubscribeForeground;
+          // Check if app was opened from a notification
+          getInitialNotification(messaging)
+          .then(notification => {
+            if (notification) {
+              handleNotification(notification.data);
+            }
+          });
+      
+          return unsubscribeForeground;
+        } catch (error) {
+          console.error('Error setting up notification listeners:', error);
+          return () => {}; // Return empty cleanup function
+        }
     }, [props.navigation]);
 
 
@@ -362,7 +368,13 @@ const Screen40 = (props: any) => {
     const renderMessageItem = ({ item }: { item: Message }) => {
         const senderInfo = typeof item.sender_id === 'object'
             ? item.sender_id
-            : { matri_id: item.sender_id?.toString() || 'Unknown' };
+            : { 
+                matri_id: item.sender_id?.toString() || 'Unknown',
+                prefix: undefined,
+                firstname: undefined,
+                lastname: undefined,
+                profile_image: undefined
+            };
 
         const receiverInfo = item.receiver_id || {};
 
@@ -371,11 +383,11 @@ const Screen40 = (props: any) => {
         const prefix = displayInfo?.prefix || '';
         const matriId = displayInfo?.matri_id || 'Unknown';
         const name = displayInfo?.firstname
-            ? `${displayInfo.firstname} ${displayInfo.lastname || ''}`.trim()
+            ? `${displayInfo?.firstname} ${displayInfo?.lastname || ''}`.trim()
             : displayInfo?.matri_id || 'Unknown';
 
         const profilePic = displayInfo?.profile_image
-            ? `http://82.29.161.246:8002/${displayInfo.profile_image}`
+            ? `http://82.29.161.246:8002/${displayInfo?.profile_image}`
             : null;
 
         const initial = name.charAt(0);

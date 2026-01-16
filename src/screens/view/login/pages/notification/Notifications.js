@@ -15,6 +15,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LottieView from 'lottie-react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { getMessaging, getInitialNotification } from '@react-native-firebase/messaging';
 
 const NotificationBell = () => {
   const navigation = useNavigation();
@@ -37,14 +38,20 @@ const NotificationBell = () => {
 
   useEffect(() => {
     const checkInitialNotification = async () => {
-      const initialNotification = await messaging().getInitialNotification();
-      if (initialNotification?.data?.screen === 'interest') {
-        setSelectedInterest({
-          id: initialNotification.data.interest_id,
-          sender_id: initialNotification.data.sender_id,
-          message: initialNotification.notification?.body || ''
-        });
-        setModalVisible(true);
+      try {
+        // Get messaging instance inside useEffect to ensure Firebase is initialized
+        const messaging = getMessaging();
+        const initialNotification = await getInitialNotification(messaging);
+        if (initialNotification?.data?.screen === 'interest') {
+          setSelectedInterest({
+            id: initialNotification.data.interest_id,
+            sender_id: initialNotification.data.sender_id,
+            message: initialNotification.notification?.body || ''
+          });
+          setModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial notification:', error);
       }
     };
     checkInitialNotification();
