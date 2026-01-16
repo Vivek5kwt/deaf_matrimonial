@@ -148,13 +148,26 @@ const ErrorScreen = ({ screenName }) => {
 
 const resolveComponent = (Component, screenName) => {
   if (Component && typeof Component === 'object' && Component.default) {
-    const resolved = Component.default;
+    const resolved = Component.default?.default ?? Component.default;
     if (resolved) {
       console.warn(`⚠️ Screen "${screenName}" imported as a module object. Using default export instead.`);
       return resolved;
     }
   }
   return Component;
+};
+
+const isValidComponentType = (Component) => {
+  if (!Component) return false;
+  if (typeof Component === 'function') return true;
+  if (typeof Component === 'object') {
+    return Boolean(
+      Component.$$typeof ||
+      Component.render ||
+      Component.prototype?.isReactComponent
+    );
+  }
+  return false;
 };
 
 // Helper function to validate and wrap components
@@ -174,9 +187,10 @@ const validateComponent = (Component, screenName) => {
     console.error(`   Components must be loaded synchronously, not via promises.`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
-  
-  if (typeof ResolvedComponent !== 'function' && typeof ResolvedComponent !== 'object') {
-    console.error(`❌ Component for screen "${screenName}" is invalid type:`, typeof ResolvedComponent);
+
+  if (!isValidComponentType(ResolvedComponent)) {
+    console.error(`❌ Component for screen "${screenName}" is not a valid React component.`);
+    console.error(`   Type: ${typeof ResolvedComponent}`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   
@@ -317,8 +331,9 @@ const ensureValidComponent = (component, screenName) => {
     console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is ${resolved === undefined ? 'undefined' : 'null'} when creating Stack.Screen!`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
-  if (typeof resolved !== 'function' && typeof resolved !== 'object') {
-    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" has invalid type: ${typeof resolved}`);
+  if (!isValidComponentType(resolved)) {
+    console.error(`❌❌❌ CRITICAL: Component for "${screenName}" is not a valid React component.`);
+    console.error(`   Type: ${typeof resolved}`);
     return (props) => <ErrorScreen screenName={screenName} />;
   }
   return resolved;
@@ -335,8 +350,9 @@ const AppNavigator = ({ navigationRef }) => {
       console.error(`❌❌❌ CRITICAL: Screen "${name}" is ${comp === undefined ? 'undefined' : 'null'}!`);
       console.error(`   This WILL cause "Element type is invalid" error!`);
       hasInvalidComponents = true;
-    } else if (typeof comp !== 'function' && typeof comp !== 'object') {
-      console.error(`❌❌❌ CRITICAL: Screen "${name}" has invalid type: ${typeof comp}`);
+    } else if (!isValidComponentType(comp)) {
+      console.error(`❌❌❌ CRITICAL: Screen "${name}" is not a valid React component.`);
+      console.error(`   Type: ${typeof comp}`);
       console.error(`   Value:`, comp);
       hasInvalidComponents = true;
     } else if (typeof comp.then === 'function') {
