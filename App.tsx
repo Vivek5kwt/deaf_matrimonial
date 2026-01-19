@@ -146,16 +146,10 @@ const ErrorScreen = ({ screenName }) => {
   );
 };
 
-const resolveComponent = (Component, screenName) => {
-  if (Component && typeof Component === 'object' && Component.default) {
-    const resolved = Component.default?.default ?? Component.default;
-    if (resolved) {
-      console.warn(`⚠️ Screen "${screenName}" imported as a module object. Using default export instead.`);
-      return resolved;
-    }
-  }
-  return Component;
+const resolveComponent = (Component) => {
+  return Component?.default ?? Component;
 };
+
 
 const isValidComponentType = (Component) => {
   if (!Component) return false;
