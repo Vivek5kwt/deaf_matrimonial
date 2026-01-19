@@ -18,7 +18,7 @@ import { angel, arrow } from "../../../../../../utils/constants/icons/icon";
 import { useNavigation } from "@react-navigation/native";
 import ReportModal from "../../../../login/pages/home/View/Modals4Cards/ReportModal";
 
-export const Screen32 = (props) => {
+const Screen32 = (props) => {
     const navigation = useNavigation();
 
     const [checked, setChecked] = useState(null);

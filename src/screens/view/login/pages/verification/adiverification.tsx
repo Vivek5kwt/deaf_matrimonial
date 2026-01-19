@@ -25,7 +25,7 @@ import { widthPercentageToDP as wp, heightPercentageToDP as hp } from 'react-nat
 
 const { width, height } = Dimensions.get('window');
 
-export const Screen15 = ({ navigation }) => {
+const Screen15 = ({ navigation }) => {
   const [aadhaarImage, setAadhaarImage] = useState(null);
   const [matriId, setMatriId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
